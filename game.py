@@ -276,10 +276,12 @@ placeing = False
 converting = False
 fieldX = 0
 fieldY = 3
+field_menu = False
+field_menu_options = ["View Field", "End Turn", "Concede"]
 
 #---------------Handle Input Events-----------------------
 def event_handler():
-    global running, selected, game_state, selected_card_index, card_menu_open, menu_option, placeing, converting, hide, fieldX, fieldY, oldFieldY, oldFieldX
+    global running, selected, game_state, selected_card_index, card_menu_open, menu_option, placeing, converting, hide, fieldX, fieldY, oldFieldY, oldFieldX, field_menu
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -318,7 +320,9 @@ def event_handler():
                 if event.key == pygame.K_s and placeing and hide:
                     fieldY += 1
                 if event.key == pygame.K_e:
-                    if not card_menu_open and not placeing and not hide and len(playerOne_hand) > 0:
+                    if not card_menu_open and not placeing and not hide and len(playerOne_hand) > 0 and playerTurn == 0:
+                        card_menu_open = True
+                    elif not card_menu_open and not placeing and not hide and len(playerTwo_hand) > 0 and playerTurn == 1:
                         card_menu_open = True
                     elif card_menu_open and menu_option == 0 and not hide:
                         placeing = True
@@ -329,22 +333,30 @@ def event_handler():
                         converting = True
                     elif not card_menu_open and placeing and hide:
                         play_card()
-                        selected_card_index -= 1
+                        reset_options()
                         placeing = False
                         hide = False
                 if event.key == pygame.K_q:
                     if card_menu_open:
                         card_menu_open = False
-                    if placeing:
+                        reset_options(False, True, True)
+                    elif placeing:
                         placeing = False
                         hide = False
-                        fieldX = 0
-                        fieldY = 3
+                        reset_options(False, True, True)
+                    elif field_menu:
+                        reset_options()
+                        field_menu = False
                 if card_menu_open:
                     if event.key == pygame.K_w:
                         menu_option = (menu_option -1) % len(action_menu)
                     if event.key == pygame.K_s:
                         menu_option = (menu_option +1) % len(action_menu)
+                if event.key == pygame.K_TAB:
+                    if not field_menu:
+                        field_menu = True
+                    else:
+                        field_menu = False
 
 def deck_draw(num):
     global deck, playerOne_hand, playerTwo_hand
@@ -397,16 +409,38 @@ def draw_card(k):
     return card
 
 def play_card():
-    global playerOne_hand, playerOne_fields
+    global playerOne_hand, playerOne_fields, resources, playerTwo_hand, playerTwo_fields
     if playerTurn == 0:
         if not playerOne_fields[fieldY-2][fieldX]["terrain"] and playerOne_hand[selected_card_index].cardType == "resource":
             card = playerOne_hand.pop(selected_card_index)
             playerOne_fields[fieldY-2][fieldX]["cards"].append(card)
             playerOne_fields[fieldY-2][fieldX]["terrain"] = True
-        if playerOne_fields[fieldY-2][fieldX]["terrain"] and resources >= playerOne_hand[selected_card_index].cost:
+        elif playerOne_fields[fieldY-2][fieldX]["terrain"] and resources >= playerOne_hand[selected_card_index].cost:
             card = playerOne_hand.pop(selected_card_index)
+            resources -= card.cost
             playerOne_fields[fieldY-2][fieldX]["cards"].append(card)
             playerOne_fields[fieldY-2][fieldX]["occupied"] = True
+    else:
+        if not playerTwo_fields[fieldY-2][fieldX]["terrain"] and playerTwo_hand[selected_card_index].cardType == "resource":
+            card = playerTwo_hand.pop(selected_card_index)
+            playerTwo_fields[fieldY-2][fieldX]["cards"].append(card)
+            playerTwo_fields[fieldY-2][fieldX]["terrain"] = True
+        elif playerTwo_fields[fieldY-2][fieldX]["terrain"] and resources >= playerTwo_hand[selected_card_index].cost:
+            card = playerTwo_hand.pop(selected_card_index)
+            resources -= card.cost
+            playerTwo_fields[fieldY-2][fieldX]["cards"].append(card)
+            playerTwo_fields[fieldY-2][fieldX]["occupied"] = True
+
+def reset_options(one=True, two=True, three=True):
+    global selected_card_index, fieldX, fieldY, menu_option, selected
+    if one:
+        selected_card_index = 0
+    if two:
+        fieldX = 0
+        fieldY = 3
+    if three:
+        menu_option = 0
+    selected = 0
 
 def update_game():
     global phase, resources, converting, selected_card_index
@@ -420,7 +454,11 @@ def update_game():
             card = playerOne_hand[selected_card_index]
             resources += card.asResource(playerOne_hand, playerOne_fields[0][5]["cards"])
             playerOne_fields[0][5]["count"] += 1
-            selected_card_index -= 1
+        else:
+            card = playerTwo_hand[selected_card_index]
+            resources += card.asResource(playerTwo_hand, playerTwo_fields[0][5]["cards"])
+            playerTwo_fields[0][5]["count"] += 1
+        reset_options()
         converting = False
 
     
@@ -448,6 +486,21 @@ def draw_game():
     window.blit(board, board.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
     x = 225
     y = 10
+    current_resources = pygame.Surface((100,20))
+    if not menu_option == 1:
+        resource_text = statFont.render("Resources: " + str(resources), True, "white")
+    else:
+        current_resources = pygame.Surface((100,20))
+        if playerTurn == 0:
+            cardCost = playerOne_hand[selected_card_index].cost // 2 if playerOne_hand[selected_card_index].cost > 1 else 1
+            cardCost += resources
+            resource_text = statFont.render("Resources: " + str(cardCost), True, "green")
+        else:
+            cardCost = playerTwo_hand[selected_card_index].cost // 2 if playerTwo_hand[selected_card_index].cost > 1 else 1
+            cardCost += resources
+            resource_text = statFont.render("Resources: " + str(cardCost), True, "green")
+    current_resources.blit(resource_text, resource_text.get_rect(topleft=(7, 5)))
+    window.blit(current_resources, current_resources.get_rect(topleft=(10,10)))
     for i in range(4):
         if i > 0:
             y += 175
@@ -468,8 +521,19 @@ def draw_game():
                             for layer in playerOne_fields[2-i][j]["cards"]:
                                 finished_layer = draw_card(layer)
                                 window.blit(finished_layer, finished_layer.get_rect(topleft=(x,y)))
-
-
+            else:
+                if i < 2:
+                    if j > 0:
+                        if len(playerOne_fields[1 - i][5 - j]["cards"]) > 0:
+                            for layer in playerOne_fields[1-i][5-j]["cards"]:
+                                finished_layer = draw_card(layer)
+                                window.blit(finished_layer, finished_layer.get_rect(topleft=(x,y)))
+                else:
+                    if j < 5:
+                        if len(playerTwo_fields[2-i][j]["cards"]):
+                            for layer in playerTwo_fields[2-i][j]["cards"]:
+                                finished_layer = draw_card(layer)
+                                window.blit(finished_layer, finished_layer.get_rect(topleft=(x,y)))
             if placeing:
                 if fieldY < 2:
                     fieldY = 3
@@ -482,6 +546,9 @@ def draw_game():
                 if j == fieldX and i == fieldY:
                     if playerTurn == 0:
                         newCard = draw_card(playerOne_hand[selected_card_index])
+                        window.blit(newCard, newCard.get_rect(topleft=(x,y)))
+                    else:
+                        newCard = draw_card(playerTwo_hand[selected_card_index])
                         window.blit(newCard, newCard.get_rect(topleft=(x,y)))
             if j == 5:
                 x = 225
@@ -502,7 +569,6 @@ def draw_game():
                 cardPos[0], cardPos[1] = 100+x, HEIGHT-175
             else:
                 window.blit(card, card.get_rect(center=(100 + x, HEIGHT - 100)))
-
         if card_menu_open:
             y =0
             menu = pygame.Surface((120,100))
@@ -514,8 +580,19 @@ def draw_game():
                 else:
                     text = statFont.render(b, True, "grey")
                 menu.blit(text, text.get_rect(topleft=(0,y)))
-
             window.blit(menu, menu.get_rect(topleft=((cardPos[0] + (125 // 2)), (cardPos[1] - (175 // 2)))))
+    if field_menu:
+        menu_overlay = pygame.Surface((WIDTH // 2, HEIGHT // 2))
+        menu_overlay.fill((0,0,0,128))
+        yOffset = 0
+        for num, choice in enumerate(field_menu_options):
+            if num > 0:
+                yOffset += 100
+            if num == selected:
+                field_option = font.render(choice, True, "gold")
+            else:
+                field_option = font.render(choice, True, "white")
+            menu_overlay.blit(field_option, field_option.get_rect(center=(WIDTH//2, 20+yOffset)))
 
 
 while running:
