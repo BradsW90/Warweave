@@ -64,7 +64,50 @@ gregory_image = load_image("img/gregory.png", (125,175))
 board = load_image("img/board.png")
 
 #-----------------Game Variables---------------------------------
-deck = [
+p1Deck = [
+    {
+        "name": "Forest",
+        "terrain": "Forest",
+        "cost": 1,
+        "atk": 0,
+        "defe": 0,
+        "effect": None,
+        "cardType": "resource",
+        "image": forest_image
+    },
+    {
+        "name": "Wild Dog",
+        "terrain": "Forest",
+        "cost": 3,
+        "atk": 4,
+        "defe": 2,
+        "effect": None,
+        "cardType": "creature",
+        "image": wild_dog_image
+    },
+    {
+        "name": "Grand Adventurer Gregory",
+        "terrain": "Forest",
+        "cost": 2,
+        "atk": 2,
+        "defe": 2,
+        "effect": None,
+        "cardType": "creature",
+        "image": gregory_image
+    },
+    {
+        "name": "Forest",
+        "terrain": "Forest",
+        "cost": 1,
+        "atk": 0,
+        "defe": 0,
+        "effect": None,
+        "cardType": "resource",
+        "image": forest_image
+    }
+]
+
+p2Deck = [
     {
         "name": "Forest",
         "terrain": "Forest",
@@ -278,11 +321,12 @@ fieldX = 0
 fieldY = 3
 field_menu = False
 field_menu_options = ["View Field", "End Turn", "Concede"]
+field_selected = 0
 
 #---------------Handle Input Events-----------------------
 def event_handler():
     global running, selected, game_state, selected_card_index, card_menu_open, menu_option, placeing, converting, hide, fieldX, fieldY, oldFieldY, oldFieldX, field_menu
-
+    global field_selected, phase, turn
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -301,15 +345,15 @@ def event_handler():
                     elif selected == 1:
                         running = False
             elif game_state == "game":
-                if event.key == pygame.K_a and not card_menu_open and not placeing:
+                if event.key == pygame.K_a and not card_menu_open and not placeing and not field_menu:
                     if playerTurn == 0 and len(playerOne_hand) > 0:
                         selected_card_index = (selected_card_index -1) % len(playerOne_hand)
-                    elif playerTurn == 1 and len(playerOne_hand) > 0:
+                    elif playerTurn == 1 and len(playerTwo_hand) > 0:
                         selected_card_index = (selected_card_index -1) % len(playerTwo_hand)
-                if event.key == pygame.K_d and not card_menu_open and not placeing:
+                if event.key == pygame.K_d and not card_menu_open and not placeing and not field_menu:
                     if playerTurn == 0 and len(playerOne_hand) > 0:
                         selected_card_index = (selected_card_index +1) % len(playerOne_hand)
-                    elif playerTurn ==1 and len(playerOne_hand) > 0:
+                    elif playerTurn ==1 and len(playerTwo_hand) > 0:
                         selected_card_index = (selected_card_index +1) % len(playerTwo_hand)
                 if event.key == pygame.K_a and placeing and hide:
                     fieldX -= 1
@@ -320,15 +364,15 @@ def event_handler():
                 if event.key == pygame.K_s and placeing and hide:
                     fieldY += 1
                 if event.key == pygame.K_e:
-                    if not card_menu_open and not placeing and not hide and len(playerOne_hand) > 0 and playerTurn == 0:
+                    if not card_menu_open and not placeing and not hide and len(playerOne_hand) > 0 and playerTurn == 0 and not field_menu:
                         card_menu_open = True
-                    elif not card_menu_open and not placeing and not hide and len(playerTwo_hand) > 0 and playerTurn == 1:
+                    elif not card_menu_open and not placeing and not hide and len(playerTwo_hand) > 0 and playerTurn == 1 and not field_menu:
                         card_menu_open = True
-                    elif card_menu_open and menu_option == 0 and not hide:
+                    elif card_menu_open and menu_option == 0 and not hide and not field_menu:
                         placeing = True
                         hide = True
                         card_menu_open = False
-                    elif card_menu_open and menu_option == 1 and not hide:
+                    elif card_menu_open and menu_option == 1 and not hide and not field_menu:
                         card_menu_open =False
                         converting = True
                     elif not card_menu_open and placeing and hide:
@@ -336,8 +380,15 @@ def event_handler():
                         reset_options()
                         placeing = False
                         hide = False
+                    elif field_menu:
+                        if field_selected == 1:
+                            reset_options()
+                            phase="end"
+                            field_selected = 0
+                            turn += 1
+                            field_menu = False
                 if event.key == pygame.K_q:
-                    if card_menu_open:
+                    if card_menu_open and not field_menu:
                         card_menu_open = False
                         reset_options(False, True, True)
                     elif placeing:
@@ -347,7 +398,7 @@ def event_handler():
                     elif field_menu:
                         reset_options()
                         field_menu = False
-                if card_menu_open:
+                if card_menu_open and not field_menu:
                     if event.key == pygame.K_w:
                         menu_option = (menu_option -1) % len(action_menu)
                     if event.key == pygame.K_s:
@@ -357,17 +408,25 @@ def event_handler():
                         field_menu = True
                     else:
                         field_menu = False
+                if field_menu:
+                    if event.key == pygame.K_w:
+                        field_selected = (field_selected -1) % len(field_menu_options)
+                    if event.key == pygame.K_s:
+                        field_selected = (field_selected +1) % len(field_menu_options)
 
 def deck_draw(num):
-    global deck, playerOne_hand, playerTwo_hand
+    global p1Deck, playerOne_hand, playerTwo_hand, p2Deck
 
     for _ in range(num):
-        draw = randint(0,len(deck)-1)
-        card = Card(**deck[draw])
-        deck.pop(draw)
         if playerTurn == 0:
-            playerOne_hand.append(card)
+                draw = randint(0,len(p1Deck)-1)
+                card = Card(**p1Deck[draw])
+                p1Deck.pop(draw)
+                playerOne_hand.append(card)
         elif playerTurn == 1:
+            draw = randint(0, len(p2Deck)-1)
+            card = Card(**p2Deck[draw])
+            p2Deck.pop(draw)
             playerTwo_hand.append(card)
 
 def draw_card(k):
@@ -443,11 +502,17 @@ def reset_options(one=True, two=True, three=True):
     selected = 0
 
 def update_game():
-    global phase, resources, converting, selected_card_index
+    global phase, resources, converting, selected_card_index, playerTurn
 
-    if phase == "draw" and turn < 2:
+    if phase == "draw" and turn == 0 :
         deck_draw(4)
         phase = "main"
+    elif phase == "draw" and turn ==1:
+        phase = "main"
+        deck_draw(4)
+    elif phase == "draw":
+        phase = "main"
+        deck_draw(1)
 
     if converting:
         if playerTurn == 0:
@@ -460,6 +525,14 @@ def update_game():
             playerTwo_fields[0][5]["count"] += 1
         reset_options()
         converting = False
+    if phase == "end":
+        print(phase)
+        if playerTurn == 0:
+            playerTurn = 1
+            phase = "draw"
+        elif playerTurn == 1:
+            playerTurn = 0
+            phase="draw"
 
     
 
@@ -514,20 +587,22 @@ def draw_game():
                         if len(playerTwo_fields[1 - i][5 - j]["cards"]) > 0:
                             for layer in playerTwo_fields[1 - i][5 - j]["cards"]:
                                 finished_layer = draw_card(layer)
-                                window.blit(finished_layer, finished_layer.get_rect(topleft=(x,y)))
+                                fixed = pygame.transform.rotate(finished_layer, 180)
+                                window.blit(fixed, fixed.get_rect(topleft=(x,y)))
                 else:
                     if j < 5:
                         if len(playerOne_fields[2-i][j]["cards"]):
                             for layer in playerOne_fields[2-i][j]["cards"]:
                                 finished_layer = draw_card(layer)
                                 window.blit(finished_layer, finished_layer.get_rect(topleft=(x,y)))
-            else:
+            elif playerTurn == 1:
                 if i < 2:
                     if j > 0:
                         if len(playerOne_fields[1 - i][5 - j]["cards"]) > 0:
                             for layer in playerOne_fields[1-i][5-j]["cards"]:
                                 finished_layer = draw_card(layer)
-                                window.blit(finished_layer, finished_layer.get_rect(topleft=(x,y)))
+                                fixed = pygame.transform.rotate(finished_layer, 180)
+                                window.blit(fixed, fixed.get_rect(topleft=(x,y)))
                 else:
                     if j < 5:
                         if len(playerTwo_fields[2-i][j]["cards"]):
@@ -582,17 +657,18 @@ def draw_game():
                 menu.blit(text, text.get_rect(topleft=(0,y)))
             window.blit(menu, menu.get_rect(topleft=((cardPos[0] + (125 // 2)), (cardPos[1] - (175 // 2)))))
     if field_menu:
-        menu_overlay = pygame.Surface((WIDTH // 2, HEIGHT // 2))
-        menu_overlay.fill((0,0,0,128))
+        menu_overlay = pygame.Surface((WIDTH // 2, HEIGHT // 2), pygame.SRCALPHA)
+        menu_overlay.fill((0,0,0, 128))
         yOffset = 0
         for num, choice in enumerate(field_menu_options):
             if num > 0:
                 yOffset += 100
-            if num == selected:
+            if num == field_selected:
                 field_option = font.render(choice, True, "gold")
             else:
                 field_option = font.render(choice, True, "white")
-            menu_overlay.blit(field_option, field_option.get_rect(center=(WIDTH//2, 20+yOffset)))
+            menu_overlay.blit(field_option, field_option.get_rect(center=(menu_overlay.width//2, 75+yOffset)))
+        window.blit(menu_overlay, menu_overlay.get_rect(center=(WIDTH//2,HEIGHT//2)))
 
 
 while running:
